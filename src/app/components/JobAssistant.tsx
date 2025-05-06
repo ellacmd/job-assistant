@@ -27,7 +27,7 @@ export default function JobAssistant() {
     const [showModal, setShowModal] = useState(false);
     const [selectedApp, setSelectedApp] = useState<Application | null>(null);
 
-    const API_KEY = process.env.NEXT_PUBLIC_API_KEY
+    const API_KEY = process.env.NEXT_PUBLIC_API_KEY;
 
     useEffect(() => {
         const stored = localStorage.getItem('applications');
@@ -45,7 +45,6 @@ export default function JobAssistant() {
 
         try {
             if (file.type === 'application/pdf') {
-             
                 setError(
                     'PDF upload is temporarily disabled. Please paste your CV directly.'
                 );
@@ -74,7 +73,6 @@ export default function JobAssistant() {
         setError(null);
         setStreamingCoverLetter('');
         setLoading(true);
-      
 
         if (!jobDescription.trim() || !cv.trim()) {
             setError('Please provide both job description and CV');
@@ -109,7 +107,6 @@ export default function JobAssistant() {
                 const { value, done: doneReading } = await reader.read();
                 done = doneReading;
                 if (value) {
-              
                     const chunkStr = decoder.decode(value);
                     for (const line of chunkStr.split('\n')) {
                         if (!line.trim()) continue;
@@ -122,9 +119,7 @@ export default function JobAssistant() {
                                     (prev) => prev + content
                                 );
                             }
-                        } catch (err) {
-                      
-                        }
+                        } catch (err) {}
                     }
                 }
             }
@@ -153,16 +148,13 @@ export default function JobAssistant() {
             setError('Error generating cover letter. Please try again.');
         } finally {
             setLoading(false);
-           
         }
     };
-
-
 
     const exportToPDF = async (content: string) => {
         try {
             const html2pdf = (await import('html2pdf.js')).default;
- 
+
             const element = document.createElement('div');
             element.innerHTML = `
                 <div style="
