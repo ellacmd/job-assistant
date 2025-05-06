@@ -27,6 +27,8 @@ export default function JobAssistant() {
     const [showModal, setShowModal] = useState(false);
     const [selectedApp, setSelectedApp] = useState<Application | null>(null);
 
+    const API_KEY = process.env.NEXT_PUBLIC_API_KEY
+
     useEffect(() => {
         const stored = localStorage.getItem('applications');
         if (stored) {
@@ -72,7 +74,7 @@ export default function JobAssistant() {
         setError(null);
         setStreamingCoverLetter('');
         setLoading(true);
-        console.log('Generation started.');
+      
 
         if (!jobDescription.trim() || !cv.trim()) {
             setError('Please provide both job description and CV');
@@ -151,7 +153,7 @@ export default function JobAssistant() {
             setError('Error generating cover letter. Please try again.');
         } finally {
             setLoading(false);
-            console.log('Generation finished. Loading:', loading);
+           
         }
     };
 
