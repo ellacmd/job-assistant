@@ -1,14 +1,20 @@
 import OpenAI from 'openai';
 
+
 const openai = new OpenAI({
     apiKey: process.env.NEXT_PUBLIC_API_KEY,
 });
 
-export const runtime = 'edge';
 
 export async function POST(req: Request) {
     try {
         const { jobDescription, resume, tone, length } = await req.json();
+
+        if (!jobDescription || !resume) {
+            return new Response('Job description and resume are required', {
+                status: 400,
+            });
+        }
 
         const fitScoreResponse = await openai.chat.completions.create({
             model: 'gpt-4',
@@ -55,6 +61,7 @@ export async function POST(req: Request) {
         const headers = new Headers({ 'x-fit-score': fitScore.toString() });
         return new Response(stream, { headers });
     } catch (error: unknown) {
+        console.error('API Error:', error);
         const errMsg =
             typeof error === 'object' && error && 'message' in error
                 ? (error as { message: string }).message

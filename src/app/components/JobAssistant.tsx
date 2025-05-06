@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import mammoth from 'mammoth';
 import type { Html2PdfInstance } from 'html2pdf.js';
 
+
 interface Application {
     id: string;
     jobDescription: string;
@@ -15,6 +16,22 @@ interface Application {
     date: string;
 }
 
+type TextItem = {
+    str: string;
+    transform: number[];
+    width: number;
+    height: number;
+    dir: string;
+    fontName: string;
+};
+
+type TextMarkedContent = {
+    type: string;
+    id: string;
+};
+
+type TextContentItem = TextItem | TextMarkedContent;
+
 export default function JobAssistant() {
     const [jobDescription, setJobDescription] = useState('');
     const [cv, setCv] = useState('');
@@ -23,10 +40,15 @@ export default function JobAssistant() {
     const [applications, setApplications] = useState<Application[]>([]);
     const [error, setError] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const streamingContainerRef = useRef<HTMLDivElement>(null);
+    const streamingTextRef = useRef<HTMLDivElement>(null);
     const [loading, setLoading] = useState(false);
     const [streamingCoverLetter, setStreamingCoverLetter] = useState('');
     const [showModal, setShowModal] = useState(false);
     const [selectedApp, setSelectedApp] = useState<Application | null>(null);
+    const [isPdfInitializing, setIsPdfInitializing] = useState(true);
+    const pdfjsLibRef = useRef<typeof import('pdfjs-dist') | null>(null);
+    const initializationPromiseRef = useRef<Promise<void> | null>(null);
 
     useEffect(() => {
         const stored = localStorage.getItem('applications');
@@ -34,6 +56,48 @@ export default function JobAssistant() {
             setApplications(JSON.parse(stored));
         }
     }, []);
+
+    useEffect(() => {
+        const initializePDF = async () => {
+            if (initializationPromiseRef.current) {
+                return initializationPromiseRef.current;
+            }
+
+            initializationPromiseRef.current = (async () => {
+                try {
+                    const pdfjsLib = await import('pdfjs-dist');
+                    pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+                    pdfjsLibRef.current = pdfjsLib;
+                    setIsPdfInitializing(false);
+                } catch (err) {
+                    setError(
+                        'Error initializing PDF support. Please try pasting your CV directly.'
+                    );
+                    setIsPdfInitializing(false);
+                    throw err;
+                }
+            })();
+
+            return initializationPromiseRef.current;
+        };
+
+        initializePDF().catch((err) => {
+            console.error('PDF initialization failed:', err);
+        });
+
+        return () => {
+            initializationPromiseRef.current = null;
+        };
+    }, []);
+
+    useEffect(() => {
+        if (streamingTextRef.current && loading) {
+            streamingTextRef.current.scrollIntoView({
+                behavior: 'smooth',
+                block: 'end',
+            });
+        }
+    }, [streamingCoverLetter, loading]);
 
     const handleFileUpload = async (
         event: React.ChangeEvent<HTMLInputElement>
@@ -44,9 +108,57 @@ export default function JobAssistant() {
 
         try {
             if (file.type === 'application/pdf') {
-                setError(
-                    'PDF upload is temporarily disabled. Please paste your CV directly.'
-                );
+                if (isPdfInitializing) {
+                    setError(
+                        'Please wait while PDF support is being initialized...'
+                    );
+                    return;
+                }
+
+                if (initializationPromiseRef.current) {
+                    await initializationPromiseRef.current;
+                }
+
+                if (!pdfjsLibRef.current) {
+                    throw new Error('PDF support is not available');
+                }
+
+                const arrayBuffer = await file.arrayBuffer();
+                const pdf = await pdfjsLibRef.current.getDocument({
+                    data: arrayBuffer,
+                }).promise;
+
+                let fullText = '';
+
+                for (let i = 1; i <= pdf.numPages; i++) {
+                    const page = await pdf.getPage(i);
+                    const textContent = await page.getTextContent();
+
+                    if (textContent.items.length === 0) {
+                        continue;
+                    }
+
+                    const pageText = textContent.items
+                        .map((item: TextContentItem) => {
+                            if ('str' in item) {
+                                return item.str;
+                            }
+                            return '';
+                        })
+                        .join(' ');
+
+                    fullText += pageText + '\n';
+                }
+
+                const processedText = fullText.trim();
+
+                if (processedText.length === 0) {
+                    throw new Error(
+                        'No text could be extracted from the PDF. The PDF might be scanned or contain only images. Please try copying and pasting the text directly into the CV field.'
+                    );
+                }
+
+                setCv(processedText);
             } else if (
                 file.type ===
                 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
@@ -56,13 +168,14 @@ export default function JobAssistant() {
                 setCv(result.value);
             } else {
                 setError(
-                    'Please upload a DOCX file or paste your CV directly.'
+                    'Please upload a PDF or DOCX file, or paste your CV directly.'
                 );
             }
-        } catch (error) {
-            console.error('File processing error:', error);
+        } catch (err) {
             setError(
-                'Unable to process file. Please try pasting your CV directly.'
+                err instanceof Error
+                    ? err.message
+                    : 'Unable to process file. Please try copying and pasting the text directly into the CV field.'
             );
         }
     };
@@ -119,7 +232,7 @@ export default function JobAssistant() {
                                 );
                             }
                         } catch {
-                            // Ignore lines that are not valid JSON
+                            continue;
                         }
                     }
                 }
@@ -144,8 +257,8 @@ export default function JobAssistant() {
                 );
                 setStreamingCoverLetter(coverLetter);
             }
-        } catch (error) {
-            console.error('Error generating cover letter:', error);
+        } catch (err) {
+        console.log(err)
             setError('Error generating cover letter. Please try again.');
         } finally {
             setLoading(false);
@@ -191,8 +304,8 @@ export default function JobAssistant() {
 
             const instance = html2pdf() as unknown as Html2PdfInstance;
             await instance.set(opt).from(element).save();
-        } catch (error) {
-            console.error('Error exporting to PDF:', error);
+        } catch (err) {
+        console.log(err)
             setError('Error exporting to PDF. Please try again.');
         }
     };
@@ -222,7 +335,7 @@ export default function JobAssistant() {
                             type='file'
                             ref={fileInputRef}
                             onChange={handleFileUpload}
-                            accept='.docx'
+                            accept='.pdf,.docx'
                             className='hidden'
                         />
                         <button
@@ -284,7 +397,6 @@ export default function JobAssistant() {
                 </button>
             </form>
 
-            {/* Add a Clear Form button below the form */}
             <button
                 type='button'
                 onClick={() => {
@@ -297,29 +409,32 @@ export default function JobAssistant() {
                 Clear Form
             </button>
 
-            {/* Streaming or last generated cover letter output */}
             {(loading || streamingCoverLetter) && (
                 <div
-                    className={`mt-6 p-4 rounded-lg whitespace-pre-wrap border ${
+                    ref={streamingContainerRef}
+                    className={`mt-6 p-4 rounded-lg border ${
                         loading ? 'bg-gray-50' : 'bg-green-50'
-                    }`}>
-                    <h3 className='font-bold mb-2'>
+                    } max-h-[80vh] flex flex-col`}>
+                    <h3 className='font-bold mb-2 flex-shrink-0'>
                         {loading
                             ? 'Generating Cover Letter...'
                             : 'Generated Cover Letter'}
                     </h3>
-                    <div>{streamingCoverLetter}</div>
+                    <div
+                        ref={streamingTextRef}
+                        className='flex-1 overflow-y-auto whitespace-pre-wrap min-h-0'>
+                        {streamingCoverLetter}
+                    </div>
                     {!loading && streamingCoverLetter && (
                         <button
                             onClick={() => exportToPDF(streamingCoverLetter)}
-                            className='mt-4 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700'>
+                            className='mt-4 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex-shrink-0'>
                             Export as PDF
                         </button>
                     )}
                 </div>
             )}
 
-            {/* Recent Applications List (latest 5) */}
             {applications.length > 0 && (
                 <div className='mt-8'>
                     <h2 className='text-2xl font-bold mb-4'>
@@ -359,7 +474,6 @@ export default function JobAssistant() {
                 </div>
             )}
 
-            {/* Modal for full application details */}
             {showModal && selectedApp && (
                 <div
                     className='fixed inset-0 z-50 flex items-center justify-center  bg-opacity-5 backdrop-blur-sm'
