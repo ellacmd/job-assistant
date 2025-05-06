@@ -8,13 +8,13 @@ declare module 'html2pdf.js' {
         };
         html2canvas?: {
             scale?: number;
-            [key: string]: any;
+            [key: string]: unknown;
         };
         jsPDF?: {
             unit?: string;
             format?: string;
             orientation?: string;
-            [key: string]: any;
+            [key: string]: unknown;
         };
     }
 
@@ -24,6 +24,9 @@ declare module 'html2pdf.js' {
         save(): Promise<void>;
     }
 
-    function html2pdf(): Html2PdfInstance;
-    export default html2pdf;
+    export default function html2pdf(): {
+        set: (opt: unknown) => unknown;
+        from: (element: HTMLElement) => unknown;
+        save: () => Promise<void>;
+    };
 }

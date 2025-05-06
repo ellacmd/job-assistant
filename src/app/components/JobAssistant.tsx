@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import mammoth from 'mammoth';
+import type { Html2PdfInstance } from 'html2pdf.js';
 
 interface Application {
     id: string;
@@ -26,8 +27,6 @@ export default function JobAssistant() {
     const [streamingCoverLetter, setStreamingCoverLetter] = useState('');
     const [showModal, setShowModal] = useState(false);
     const [selectedApp, setSelectedApp] = useState<Application | null>(null);
-
-    const API_KEY = process.env.NEXT_PUBLIC_API_KEY;
 
     useEffect(() => {
         const stored = localStorage.getItem('applications');
@@ -119,7 +118,9 @@ export default function JobAssistant() {
                                     (prev) => prev + content
                                 );
                             }
-                        } catch (err) {}
+                        } catch {
+                            // Ignore lines that are not valid JSON
+                        }
                     }
                 }
             }
@@ -188,7 +189,8 @@ export default function JobAssistant() {
                 },
             };
 
-            await html2pdf().set(opt).from(element).save();
+            const instance = html2pdf() as unknown as Html2PdfInstance;
+            await instance.set(opt).from(element).save();
         } catch (error) {
             console.error('Error exporting to PDF:', error);
             setError('Error exporting to PDF. Please try again.');

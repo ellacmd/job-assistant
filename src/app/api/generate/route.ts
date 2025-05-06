@@ -1,7 +1,5 @@
 import OpenAI from 'openai';
 
-
-
 const openai = new OpenAI({
     apiKey: process.env.NEXT_PUBLIC_API_KEY,
 });
@@ -11,7 +9,6 @@ export const runtime = 'edge';
 export async function POST(req: Request) {
     try {
         const { jobDescription, resume, tone, length } = await req.json();
- 
 
         const fitScoreResponse = await openai.chat.completions.create({
             model: 'gpt-4',
@@ -57,10 +54,11 @@ export async function POST(req: Request) {
         const stream = response.toReadableStream();
         const headers = new Headers({ 'x-fit-score': fitScore.toString() });
         return new Response(stream, { headers });
-    } catch (error: any) {
-        return new Response(
-            `An error occurred: ${error?.message || 'Unknown error'}`,
-            { status: 500 }
-        );
+    } catch (error: unknown) {
+        const errMsg =
+            typeof error === 'object' && error && 'message' in error
+                ? (error as { message: string }).message
+                : 'Unknown error';
+        return new Response(`An error occurred: ${errMsg}`, { status: 500 });
     }
 }
