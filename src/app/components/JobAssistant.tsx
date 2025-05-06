@@ -43,7 +43,7 @@ export default function JobAssistant() {
 
         try {
             if (file.type === 'application/pdf') {
-                // For now, show a message to paste the CV directly
+             
                 setError(
                     'PDF upload is temporarily disabled. Please paste your CV directly.'
                 );
@@ -107,7 +107,7 @@ export default function JobAssistant() {
                 const { value, done: doneReading } = await reader.read();
                 done = doneReading;
                 if (value) {
-                    // Split in case multiple JSON objects are in one chunk
+              
                     const chunkStr = decoder.decode(value);
                     for (const line of chunkStr.split('\n')) {
                         if (!line.trim()) continue;
@@ -121,7 +121,7 @@ export default function JobAssistant() {
                                 );
                             }
                         } catch (err) {
-                            // Ignore lines that are not valid JSON
+                      
                         }
                     }
                 }
@@ -155,22 +155,12 @@ export default function JobAssistant() {
         }
     };
 
-    const calculateFitScore = (jobDesc: string, cv: string): number => {
-        const jobKeywords = jobDesc.toLowerCase().split(/\W+/);
-        const cvKeywords = cv.toLowerCase().split(/\W+/);
-        const matches = jobKeywords.filter(
-            (keyword) => keyword.length > 3 && cvKeywords.includes(keyword)
-        );
-        return Math.min(
-            100,
-            Math.round((matches.length / jobKeywords.length) * 100)
-        );
-    };
+
 
     const exportToPDF = async (content: string) => {
         try {
             const html2pdf = (await import('html2pdf.js')).default;
-            // Use a styled template for the letter with extra top/bottom padding
+ 
             const element = document.createElement('div');
             element.innerHTML = `
                 <div style="
